@@ -12,6 +12,12 @@ alignment:
   model_dir: state/models
   model_cache_only: false
   interpolate_method: ignore
+  boundary_refinement_enabled: true
+  boundary_silence_threshold_db: -38.0
+  boundary_silence_minimum: 0.08
+  boundary_search_radius: 0.75
+  boundary_speech_padding: 0.02
+  boundary_embedded_silence_minimum: 0.30
 
 quality:
   pass_coverage: 0.99

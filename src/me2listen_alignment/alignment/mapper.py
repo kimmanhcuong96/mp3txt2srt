@@ -12,6 +12,7 @@ class MappingResult:
     expected_words: int
     matched_words: int
     unmatched_expected: tuple[str, ...]
+    words_by_line: tuple[tuple[AlignedWord, ...], ...]
 
     @property
     def coverage(self) -> float:
@@ -32,9 +33,11 @@ def map_words_to_lines(lines: list[ScriptLine], aligned_words: tuple[AlignedWord
             matches[block.a + offset] = aligned_words[block.b + offset]
 
     cues: list[SubtitleCue] = []
+    words_by_line: list[tuple[AlignedWord, ...]] = []
     for line_position, line in enumerate(lines):
         positions = [position for position, owner in enumerate(owners) if owner == line_position]
         timed = [matches[position] for position in positions if position in matches]
+        words_by_line.append(tuple(timed))
         if not timed:
             continue
         scores = [word.score for word in timed if word.score is not None]
@@ -50,5 +53,4 @@ def map_words_to_lines(lines: list[ScriptLine], aligned_words: tuple[AlignedWord
             )
         )
     unmatched = tuple(expected[index] for index in range(len(expected)) if index not in matches)
-    return MappingResult(tuple(cues), len(expected), len(matches), unmatched)
-
+    return MappingResult(tuple(cues), len(expected), len(matches), unmatched, tuple(words_by_line))

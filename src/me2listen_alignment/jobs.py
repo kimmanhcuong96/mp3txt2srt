@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 """
 
+PIPELINE_REVISION = "embedded-speech-boundary-v3"
+
 
 class JobStore:
     def __init__(self, path: Path):
@@ -138,4 +140,4 @@ def _input_signature(pair: LessonPair) -> str:
             values.append(f"{path.resolve()}:{stat.st_size}:{stat.st_mtime_ns}")
         except OSError:
             values.append(f"{path.absolute()}:missing")
-    return "|".join(values)
+    return PIPELINE_REVISION + "|" + "|".join(values)

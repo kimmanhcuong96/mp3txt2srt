@@ -16,6 +16,7 @@ class EngineResult:
     words: tuple[AlignedWord, ...]
     duration_seconds: float
     leading_silence_seconds: float
+    silence_intervals: tuple[tuple[float, float], ...] = ()
 
 
 class WhisperXEngine:
@@ -81,10 +82,16 @@ class WhisperXEngine:
             for piece in pieces:
                 words.append(AlignedWord(raw_text.strip(), piece, start, end, score))
         leading = _detect_leading_silence(audio, self.sample_rate, self.silence_threshold_db)
+        silence_intervals = _detect_silence_intervals(
+            audio,
+            self.sample_rate,
+            self.config.boundary_silence_threshold_db,
+            self.config.boundary_silence_minimum,
+        ) if self.config.boundary_refinement_enabled else ()
         del audio, aligned
         if self.config.device == "cuda":
             self.torch.cuda.empty_cache()
-        return EngineResult(tuple(words), duration, leading)
+        return EngineResult(tuple(words), duration, leading, silence_intervals)
 
     def close(self) -> None:
         if hasattr(self, "model"):
@@ -114,3 +121,37 @@ def _detect_leading_silence(audio: Any, sample_rate: int, threshold_db: float) -
             return round(index * frame_size / sample_rate, 3)
     return round(len(values) / sample_rate, 3)
 
+
+def _detect_silence_intervals(
+    audio: Any,
+    sample_rate: int,
+    threshold_db: float,
+    minimum_duration: float,
+) -> tuple[tuple[float, float], ...]:
+    """Detect sustained low-energy ranges used only to tighten cue boundaries."""
+    import numpy as np
+
+    values = np.asarray(audio, dtype=np.float32).reshape(-1)
+    if not len(values):
+        return ()
+    frame_size = max(1, round(sample_rate * 0.01))
+    frame_count = len(values) // frame_size
+    if frame_count == 0:
+        return ()
+    frames = values[: frame_count * frame_size].reshape(frame_count, frame_size)
+    rms = np.sqrt(np.mean(frames * frames, axis=1))
+    quiet = rms < 10 ** (threshold_db / 20.0)
+    minimum_frames = max(1, math.ceil(minimum_duration * sample_rate / frame_size))
+    intervals: list[tuple[float, float]] = []
+    start: int | None = None
+    for index, is_quiet in enumerate(quiet):
+        if bool(is_quiet) and start is None:
+            start = index
+        if start is not None and (not bool(is_quiet) or index == len(quiet) - 1):
+            end = index if not bool(is_quiet) else index + 1
+            if end - start >= minimum_frames:
+                intervals.append(
+                    (round(start * frame_size / sample_rate, 3), round(end * frame_size / sample_rate, 3))
+                )
+            start = None
+    return tuple(intervals)

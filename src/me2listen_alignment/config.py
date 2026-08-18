@@ -16,6 +16,12 @@ class AlignmentConfig:
     model_dir: Path = Path("state/models")
     model_cache_only: bool = False
     interpolate_method: str = "ignore"
+    boundary_refinement_enabled: bool = True
+    boundary_silence_threshold_db: float = -38.0
+    boundary_silence_minimum: float = 0.08
+    boundary_search_radius: float = 0.75
+    boundary_speech_padding: float = 0.02
+    boundary_embedded_silence_minimum: float = 0.30
 
 
 @dataclass(slots=True)
@@ -53,6 +59,14 @@ class AppConfig:
             raise ValueError("alignment.device must be 'cuda' or 'cpu'")
         if self.alignment.interpolate_method != "ignore":
             raise ValueError("alignment.interpolate_method must be 'ignore' so missing timing is never invented")
+        if (
+            self.alignment.boundary_silence_minimum <= 0
+            or self.alignment.boundary_search_radius <= 0
+            or self.alignment.boundary_embedded_silence_minimum <= 0
+        ):
+            raise ValueError("alignment boundary duration and search radius must be positive")
+        if self.alignment.boundary_speech_padding < 0:
+            raise ValueError("alignment.boundary_speech_padding cannot be negative")
         if not 0 <= self.quality.warning_coverage <= self.quality.pass_coverage <= 1:
             raise ValueError("quality coverage thresholds must satisfy 0 <= warning <= pass <= 1")
         if not 0 <= self.quality.suspicious_line_coverage <= 1 or not 0 <= self.quality.low_word_score <= 1:

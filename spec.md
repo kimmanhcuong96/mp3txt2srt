@@ -195,6 +195,11 @@ The pipeline MUST NOT use an LLM to rewrite the script.
 
 The supplied script is the transcript to be aligned.
 
+An audio file may contain a spoken title, intro, or outro that is intentionally not
+part of the lesson script. When such external speech is separated from the target
+content by a reliable long silence, exclude it from the first/last SRT cue. Do not
+add the external speech to SRT and do not rewrite the supplied script.
+
 
 ## 6. AUDIO REQUIREMENTS
 
@@ -376,6 +381,12 @@ For every script line:
 
 start = earliest aligned word start
 end   = latest aligned word end
+
+When adjacent WhisperX cue boundaries touch or bleed into neighboring speech, the
+pipeline may refine the boundary using a measured low-energy/silence interval in the
+source audio. The previous cue ends near the start of that silence and the next cue
+starts near its end. If no reliable silence exists nearby, retain the original
+WhisperX word timing rather than inventing a boundary.
 
 Required:
 

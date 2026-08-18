@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Callable
 
 from .alignment.mapper import map_words_to_lines
+from .alignment.boundary import refine_cue_boundaries
 from .alignment.whisperx_engine import WhisperXEngine
 from .config import AppConfig
 from .jobs import JobStore
@@ -132,6 +133,23 @@ class BatchProcessor:
         engine_result = self.engine.align(pair.audio_path, lines)
         self.print("Mapping aligned words to original script lines...")
         mapping = map_words_to_lines(lines, engine_result.words)
+        if self.config.alignment.boundary_refinement_enabled:
+            refined_cues = refine_cue_boundaries(
+                mapping.cues,
+                engine_result.silence_intervals,
+                engine_result.duration_seconds,
+                self.config.alignment.boundary_search_radius,
+                self.config.alignment.boundary_speech_padding,
+                mapping.words_by_line,
+                self.config.alignment.boundary_embedded_silence_minimum,
+            )
+            mapping = type(mapping)(
+                cues=refined_cues,
+                expected_words=mapping.expected_words,
+                matched_words=mapping.matched_words,
+                unmatched_expected=mapping.unmatched_expected,
+                words_by_line=mapping.words_by_line,
+            )
         report = analyze_quality(
             pair.name, lines, mapping, engine_result.duration_seconds,
             engine_result.leading_silence_seconds, self.config.quality,

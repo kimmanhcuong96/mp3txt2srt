@@ -122,6 +122,23 @@ coverage instead of receiving invented timestamps.
 
 Aligned tokens are matched in order to tokens from each authoritative script line.
 Each cue starts at its earliest matched word and ends at its latest matched word.
+A boundary-refinement pass then detects real low-energy gaps around adjacent cues:
+the previous cue ends near the beginning of the measured silence and the next cue
+starts near its end. This prevents either cue from containing the neighboring word.
+If no reliable silence is found within the configured search radius, the original
+WhisperX word timing is retained rather than guessed.
+If WhisperX stretches the first or last aligned word across a long silence because
+the audio contains an unlisted spoken title, intro, or outro, that external speech
+is excluded at the measured silence boundary. Script text remains the only target.
+
+Boundary refinement is configurable under `alignment`:
+
+- `boundary_silence_threshold_db`: energy threshold used to recognize silence.
+- `boundary_silence_minimum`: shortest accepted silence interval in seconds.
+- `boundary_search_radius`: maximum distance from the WhisperX boundary.
+- `boundary_speech_padding`: small safety margin retained beside speech.
+- `boundary_embedded_silence_minimum`: long silence used to reject unlisted intro/outro speech.
+
 A line with no aligned words, non-monotonic/overlapping timing, or coverage below the
 configured failure threshold produces `FAIL` and no SRT. Long lines are retained
 unchanged and reported as warnings.
