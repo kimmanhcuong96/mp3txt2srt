@@ -32,6 +32,22 @@ class ScriptTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "timestamps"):
             parse_script(self._write("[00:01.500] Hello.\n"))
 
+    def test_allows_spoken_clock_times(self):
+        lines = parse_script(
+            self._write(
+                "At 10:15 A.M. the students have recess.\n"
+                "At 10:30 A.M. the students go to gym class.\n"
+                "At 11:15 A.M. the students return to class.\n"
+            )
+        )
+        self.assertEqual(len(lines), 3)
+
+    def test_rejects_srt_timing_line(self):
+        with self.assertRaisesRegex(ValueError, "timestamps"):
+            parse_script(
+                self._write("00:00:01,500 --> 00:00:03,000\nHello.\n")
+            )
+
     def test_rejects_numbering_and_speaker_labels(self):
         with self.assertRaisesRegex(ValueError, "numbering"):
             parse_script(self._write("1. Hello.\n"))
