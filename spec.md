@@ -108,6 +108,9 @@ The canonical format is:
 
 ONE SENTENCE PER LINE.
 
+Leading and trailing whitespace on each non-empty line is automatically trimmed
+before validation and SRT generation. Lines containing only whitespace are ignored.
+
 ### 4.2 Sentence boundaries are authoritative
 
 If the script contains:

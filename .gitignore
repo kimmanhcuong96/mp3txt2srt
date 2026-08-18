@@ -2,8 +2,8 @@
 /build/
 /dist/
 /*.egg-info/
-/input/*
-/output/*
+/input/**
+/output/**
 /logs/*
 /state/*
 !/input/.gitkeep

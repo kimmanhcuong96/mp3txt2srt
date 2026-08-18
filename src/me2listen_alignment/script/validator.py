@@ -13,8 +13,6 @@ def validate_raw_lines(lines: list[tuple[int, str]]) -> None:
         raise ValueError("Script must contain at least one non-empty line")
     errors: list[str] = []
     for number, text in lines:
-        if text != text.strip():
-            errors.append(f"line {number}: leading/trailing whitespace is not allowed")
         if TIMESTAMP.search(text):
             errors.append(f"line {number}: timestamps are not allowed")
         if NUMBERING.match(text):

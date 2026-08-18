@@ -14,7 +14,11 @@ def parse_script(path: Path) -> list[ScriptLine]:
         text = path.read_text(encoding="utf-8-sig")
     except UnicodeDecodeError as exc:
         raise ValueError(f"Script must be valid UTF-8: {path}") from exc
-    raw_lines = [(number, line) for number, line in enumerate(text.splitlines(), 1) if line.strip()]
+    raw_lines = [
+        (number, line.strip())
+        for number, line in enumerate(text.splitlines(), 1)
+        if line.strip()
+    ]
     validate_raw_lines(raw_lines)
     parsed: list[ScriptLine] = []
     for index, (source_number, original) in enumerate(raw_lines, 1):
@@ -24,4 +28,3 @@ def parse_script(path: Path) -> list[ScriptLine]:
             raise ValueError(f"Script line {source_number} contains no alignable words")
         parsed.append(ScriptLine(index, source_number, original, alignment_text, tokens))
     return parsed
-

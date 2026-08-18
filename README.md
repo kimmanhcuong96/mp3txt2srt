@@ -33,6 +33,8 @@ input/
 
 Every non-empty TXT line is exactly one subtitle cue. TXT must be UTF-8 and must
 not contain timestamps, numbering, speaker labels, comments, or metadata.
+Leading and trailing whitespace on each line is trimmed automatically; whitespace
+inside the sentence is preserved for SRT output.
 
 Successful output:
 

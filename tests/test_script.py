@@ -21,6 +21,13 @@ class ScriptTests(unittest.TestCase):
         self.assertEqual([line.original for line in lines], ["Hello, world!", "I’m fine."])
         self.assertEqual(lines[1].tokens, ("i'm", "fine"))
 
+    def test_trims_leading_and_trailing_whitespace(self):
+        lines = parse_script(self._write("   Hello, world!   \n\tI'm fine.\t\n   \n"))
+        self.assertEqual(
+            [line.original for line in lines],
+            ["Hello, world!", "I'm fine."],
+        )
+
     def test_rejects_timestamps(self):
         with self.assertRaisesRegex(ValueError, "timestamps"):
             parse_script(self._write("[00:01.500] Hello.\n"))
