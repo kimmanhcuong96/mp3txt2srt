@@ -1,0 +1,112 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+
+@dataclass(slots=True)
+class AlignmentConfig:
+    language: str = "en"
+    device: str = "cuda"
+    batch_size: int = 1
+    model_name: str | None = None
+    model_dir: Path = Path("state/models")
+    model_cache_only: bool = False
+    interpolate_method: str = "ignore"
+
+
+@dataclass(slots=True)
+class QualityConfig:
+    pass_coverage: float = 0.99
+    warning_coverage: float = 0.95
+    long_line_characters: int = 84
+    long_line_words: int = 20
+    suspicious_line_coverage: float = 0.90
+    low_word_score: float = 0.50
+    leading_silence_minimum: float = 0.5
+    leading_silence_maximum: float = 1.0
+    silence_threshold_db: float = -45.0
+
+
+@dataclass(slots=True)
+class AppConfig:
+    input_dir: Path = Path("input")
+    output_dir: Path = Path("output")
+    state_db: Path = Path("state/jobs.sqlite")
+    report_dir: Path = Path("state/reports")
+    log_file: Path = Path("logs/alignment.log")
+    alignment: AlignmentConfig = field(default_factory=AlignmentConfig)
+    quality: QualityConfig = field(default_factory=QualityConfig)
+    retry_count: int = 2
+    copy_audio_to_output: bool = True
+    package_name: str = "me2listen-batch-001.zip"
+
+    def validate(self) -> None:
+        if self.retry_count < 1:
+            raise ValueError("retry_count must be at least 1")
+        if self.alignment.batch_size != 1:
+            raise ValueError("alignment.batch_size must be 1 for the sequential v1 pipeline")
+        if self.alignment.device not in {"cuda", "cpu"}:
+            raise ValueError("alignment.device must be 'cuda' or 'cpu'")
+        if self.alignment.interpolate_method != "ignore":
+            raise ValueError("alignment.interpolate_method must be 'ignore' so missing timing is never invented")
+        if not 0 <= self.quality.warning_coverage <= self.quality.pass_coverage <= 1:
+            raise ValueError("quality coverage thresholds must satisfy 0 <= warning <= pass <= 1")
+        if not 0 <= self.quality.suspicious_line_coverage <= 1 or not 0 <= self.quality.low_word_score <= 1:
+            raise ValueError("line coverage and word score thresholds must be between 0 and 1")
+        if self.quality.leading_silence_minimum > self.quality.leading_silence_maximum:
+            raise ValueError("leading silence minimum cannot exceed maximum")
+        if Path(self.package_name).name != self.package_name or not self.package_name.lower().endswith(".zip"):
+            raise ValueError("package_name must be a plain .zip filename")
+
+
+def _path(value: Any) -> Path:
+    return value if isinstance(value, Path) else Path(str(value))
+
+
+def load_config(path: Path | None = None, overrides: dict[str, Any] | None = None) -> AppConfig:
+    default_path = Path(__file__).resolve().parents[2] / "config" / "default.yaml"
+    selected = path or (default_path if default_path.is_file() else None)
+    raw: dict[str, Any] = {}
+    if selected:
+        if not selected.is_file():
+            raise FileNotFoundError(f"Configuration file not found: {selected}")
+        loaded = yaml.safe_load(selected.read_text(encoding="utf-8")) or {}
+        if not isinstance(loaded, dict):
+            raise ValueError("Configuration root must be a mapping")
+        raw.update(loaded)
+    if overrides:
+        raw.update({key: value for key, value in overrides.items() if value is not None})
+
+    allowed = {
+        "input_dir", "output_dir", "state_db", "report_dir",
+        "log_file", "alignment", "quality", "retry_count", "copy_audio_to_output", "package_name",
+    }
+    unknown = set(raw) - allowed
+    if unknown:
+        raise ValueError(f"Unknown configuration keys: {', '.join(sorted(unknown))}")
+    alignment_raw = raw.pop("alignment", {}) or {}
+    quality_raw = raw.pop("quality", {}) or {}
+    if not isinstance(alignment_raw, dict) or not isinstance(quality_raw, dict):
+        raise ValueError("alignment and quality configuration must be mappings")
+    alignment_allowed = set(AlignmentConfig.__dataclass_fields__)
+    quality_allowed = set(QualityConfig.__dataclass_fields__)
+    if set(alignment_raw) - alignment_allowed:
+        raise ValueError(f"Unknown alignment keys: {', '.join(sorted(set(alignment_raw) - alignment_allowed))}")
+    if set(quality_raw) - quality_allowed:
+        raise ValueError(f"Unknown quality keys: {', '.join(sorted(set(quality_raw) - quality_allowed))}")
+    if "model_dir" in alignment_raw:
+        alignment_raw["model_dir"] = _path(alignment_raw["model_dir"])
+    for key in ("input_dir", "output_dir", "state_db", "report_dir", "log_file"):
+        if key in raw:
+            raw[key] = _path(raw[key])
+    config = AppConfig(
+        **raw,
+        alignment=AlignmentConfig(**alignment_raw),
+        quality=QualityConfig(**quality_raw),
+    )
+    config.validate()
+    return config

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "me2listen-alignment"
+version = "1.0.0"
+description = "Local known-script to precisely timed SRT alignment pipeline"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "PyYAML==6.0.2",
+  "whisperx==3.8.6",
+  "torch==2.8.0",
+  "torchaudio==2.8.0",
+  "torchvision==0.23.0",
+  "faster-whisper==1.2.0",
+  "ctranslate2==4.6.0",
+]
+
+[project.scripts]
+me2listen-align = "me2listen_alignment.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+

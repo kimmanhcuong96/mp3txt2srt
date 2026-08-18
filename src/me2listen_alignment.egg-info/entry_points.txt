@@ -1,0 +1,2 @@
+[console_scripts]
+me2listen-align = me2listen_alignment.cli:main

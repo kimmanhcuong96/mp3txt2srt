@@ -1,0 +1,29 @@
+input_dir: input
+output_dir: output
+state_db: state/jobs.sqlite
+report_dir: state/reports
+log_file: logs/alignment.log
+
+alignment:
+  language: en
+  device: cuda
+  batch_size: 1
+  model_name: null
+  model_dir: state/models
+  model_cache_only: false
+  interpolate_method: ignore
+
+quality:
+  pass_coverage: 0.99
+  warning_coverage: 0.95
+  long_line_characters: 84
+  long_line_words: 20
+  suspicious_line_coverage: 0.90
+  low_word_score: 0.50
+  leading_silence_minimum: 0.5
+  leading_silence_maximum: 1.0
+  silence_threshold_db: -45.0
+
+retry_count: 2
+copy_audio_to_output: true
+package_name: me2listen-batch-001.zip
