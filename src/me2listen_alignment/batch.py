@@ -190,10 +190,11 @@ def _validate_pair(pair: LessonPair) -> None:
         raise PermanentJobError(f"MP3 file not found: {pair.audio_path}")
     if not pair.script_path.is_file():
         raise PermanentJobError(f"TXT file not found: {pair.script_path}")
-    if pair.audio_path.suffix.casefold() != ".mp3" or pair.script_path.suffix.casefold() != ".txt":
-        raise PermanentJobError("Input pair must use .mp3 and .txt extensions")
-    if pair.audio_path.stem.casefold() != pair.script_path.stem.casefold():
-        raise PermanentJobError("MP3 and TXT basenames must match")
+    if pair.audio_path.suffix.casefold() != ".mp3" or not pair.script_path.name.casefold().endswith(".en.txt"):
+        raise PermanentJobError("Input pair must use .mp3 and .en.txt extensions")
+    script_basename = pair.script_path.name[:-len(".en.txt")]
+    if pair.audio_path.stem.casefold() != script_basename.casefold():
+        raise PermanentJobError("MP3 basename must match the part before .en.txt")
     if pair.srt_path.stem.casefold() != pair.audio_path.stem.casefold():
         raise PermanentJobError("Output SRT basename must match the input MP3")
 

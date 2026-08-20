@@ -80,12 +80,12 @@ Pipeline
 Each lesson consists of:
 
 lesson-name.mp3
-lesson-name.txt
+lesson-name.en.txt
 
 Example:
 
 001-greetings.mp3
-001-greetings.txt
+001-greetings.en.txt
 
 The script file must be UTF-8 plain text.
 
@@ -670,18 +670,18 @@ Recommended structure:
 input/
 ├── unit-01/
 │   ├── 001-greetings.mp3
-│   ├── 001-greetings.txt
+│   ├── 001-greetings.en.txt
 │   ├── 002-introductions.mp3
-│   └── 002-introductions.txt
+│   └── 002-introductions.en.txt
 │
 └── unit-02/
     ├── 001-daily-routine.mp3
-    └── 001-daily-routine.txt
+    └── 001-daily-routine.en.txt
 
-Match files by basename:
+Match the MP3 basename with the part before `.en.txt`:
 
 001-greetings.mp3
-001-greetings.txt
+001-greetings.en.txt
 
 Each MP3 and TXT pair must be located in the same directory.
 
@@ -966,7 +966,7 @@ Final contract:
 
 Input:
 lesson-name.mp3
-lesson-name.txt
+lesson-name.en.txt
 
 Output:
 lesson-name.mp3

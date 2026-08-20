@@ -27,11 +27,11 @@ class JobsDiscoveryTests(unittest.TestCase):
         (self.config.input_dir / "one.mp3").write_bytes(b"audio")
         pairs = discover_pairs(self.config)
         self.assertEqual(len(pairs), 1)
-        self.assertEqual(pairs[0].script_path.name, "one.txt")
+        self.assertEqual(pairs[0].script_path.name, "one.en.txt")
 
     def test_sqlite_state_resets_when_input_changes(self):
         audio = self.config.input_dir / "one.mp3"
-        script = self.config.input_dir / "one.txt"
+        script = self.config.input_dir / "one.en.txt"
         audio.write_bytes(b"audio")
         script.write_text("Hello.\n", encoding="utf-8")
         pairs = discover_pairs(self.config)
@@ -56,11 +56,11 @@ class JobsDiscoveryTests(unittest.TestCase):
         unit.mkdir(parents=True)
         for lesson in ("one", "two"):
             (unit / f"{lesson}.mp3").write_bytes(b"audio")
-            (unit / f"{lesson}.txt").write_text("Hello.\n", encoding="utf-8")
+            (unit / f"{lesson}.en.txt").write_text("Hello.\n", encoding="utf-8")
         other = self.config.input_dir / "course/unit-02"
         other.mkdir(parents=True)
         (other / "one.mp3").write_bytes(b"audio")
-        (other / "one.txt").write_text("Hello.\n", encoding="utf-8")
+        (other / "one.en.txt").write_text("Hello.\n", encoding="utf-8")
 
         pairs = discover_pairs(self.config)
 
@@ -70,4 +70,21 @@ class JobsDiscoveryTests(unittest.TestCase):
         self.assertEqual(
             pairs[1].srt_path,
             self.config.output_dir / "course/unit-01/two.srt",
+        )
+
+    def test_pairs_mp3_with_language_suffixed_script(self):
+        unit = self.config.input_dir / "section1"
+        unit.mkdir(parents=True)
+        (unit / "01_First Snow Fall.mp3").write_bytes(b"audio")
+        (unit / "01_First Snow Fall.en.txt").write_text(
+            "The snow is falling.\n", encoding="utf-8"
+        )
+
+        pairs = discover_pairs(self.config)
+
+        self.assertEqual(len(pairs), 1)
+        self.assertEqual(pairs[0].name, "section1/01_First Snow Fall")
+        self.assertEqual(
+            pairs[0].srt_path,
+            self.config.output_dir / "section1/01_First Snow Fall.srt",
         )

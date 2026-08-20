@@ -16,19 +16,20 @@ or modifies the source MP3.
 
 ## Input and output
 
-Put each MP3 beside its matching TXT. The scanner is recursive, and every
+Put each MP3 beside its matching `.en.txt` script. For example,
+`01_First Snow Fall.mp3` pairs with `01_First Snow Fall.en.txt`. The scanner is recursive, and every
 subdirectory may contain any number of pairs:
 
 ```text
 input/
 ├── unit-01/
 │   ├── 001-greetings.mp3
-│   ├── 001-greetings.txt
+│   ├── 001-greetings.en.txt
 │   ├── 002-introductions.mp3
-│   └── 002-introductions.txt
+│   └── 002-introductions.en.txt
 └── unit-02/
     ├── 001-daily-routine.mp3
-    └── 001-daily-routine.txt
+    └── 001-daily-routine.en.txt
 ```
 
 Every non-empty TXT line is exactly one subtitle cue. TXT must be UTF-8 and must

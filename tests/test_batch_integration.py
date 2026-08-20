@@ -46,7 +46,7 @@ class BatchIntegrationTests(unittest.TestCase):
             lesson_dir.mkdir(parents=True)
             source_bytes = b"original-mp3-bytes"
             (lesson_dir / "lesson.mp3").write_bytes(source_bytes)
-            (lesson_dir / "lesson.txt").write_text("Hello, world!\n", encoding="utf-8")
+            (lesson_dir / "lesson.en.txt").write_text("Hello, world!\n", encoding="utf-8")
             pairs = discover_pairs(config)
             store = JobStore(config.state_db)
             try:
