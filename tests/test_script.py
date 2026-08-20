@@ -56,6 +56,15 @@ class ScriptTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "speaker"):
             parse_script(self._write("John: Hello.\n"))
 
+    def test_allows_colon_inside_natural_sentence(self):
+        text = "My grandparents have two sons: my father and my Uncle Bill."
+        lines = parse_script(self._write(text + "\n"))
+        self.assertEqual(lines[0].original, text)
+
+    def test_rejects_explicit_metadata(self):
+        with self.assertRaisesRegex(ValueError, "metadata"):
+            parse_script(self._write("lesson title: My Family\n"))
+
     def test_rejects_non_utf8(self):
         self.directory = tempfile.TemporaryDirectory()
         path = Path(self.directory.name) / "lesson.txt"

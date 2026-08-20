@@ -9,7 +9,14 @@ BARE_TIMESTAMP_LINE = re.compile(
     r"^\s*\d{1,2}:\d{2}:\d{2}(?:[.,]\d+)?\s*$"
 )
 NUMBERING = re.compile(r"^\s*(?:\d+|\d+[.)]\s+.*)$")
-SPEAKER_OR_METADATA = re.compile(r"^\s*[A-Za-z][A-Za-z0-9 _-]{0,39}:\s+\S")
+SPEAKER_LABEL = re.compile(
+    r"^\s*[A-Z][A-Za-z'’-]*(?:\s+[A-Z][A-Za-z'’-]*){0,2}:\s+\S"
+)
+METADATA = re.compile(
+    r"^\s*(?:lesson(?:\s+(?:title|id))?|title|slug|speaker|language|metadata|"
+    r"config(?:uration)?):\s+\S",
+    re.IGNORECASE,
+)
 COMMENT = re.compile(r"^\s*(?:#|//|;)\s*")
 
 
@@ -29,7 +36,7 @@ def validate_raw_lines(lines: list[tuple[int, str]]) -> None:
             errors.append(f"line {number}: timestamps are not allowed")
         if NUMBERING.match(text):
             errors.append(f"line {number}: subtitle numbering is not allowed")
-        if SPEAKER_OR_METADATA.match(text):
+        if SPEAKER_LABEL.match(text) or METADATA.match(text):
             errors.append(f"line {number}: speaker labels or metadata are not supported")
         if COMMENT.match(text):
             errors.append(f"line {number}: comments are not allowed")
