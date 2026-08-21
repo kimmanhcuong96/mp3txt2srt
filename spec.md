@@ -1,9 +1,12 @@
 # me2listen — Local Lesson Alignment Pipeline
 # Case A: MP3 + Script → Standard SRT
+# Case B: MP3-only → Standard SRT (local ASR fallback, Section 3B)
 
 ## 1. OBJECTIVE
 
 Build a fully local, free Python application that converts:
+
+Case A — a `.en.txt` script is supplied:
 
 MP3 + TXT Script
     ↓
@@ -17,7 +20,29 @@ Standard SRT
     ↓
 Validation / Quality Report
 
-The application is responsible ONLY for converting an existing audio file and its corresponding script into a precisely timed Standard SRT file.
+Case B — no `.en.txt` exists for that lesson (see Section 3B):
+
+MP3 only
+    ↓
+Local English ASR (confidence-gated)
+    ↓
+Punctuated sentence lines
+    ↓
+WhisperX Forced Alignment  (same engine as Case A)
+    ↓
+Word-level timestamps
+    ↓
+Script-line mapping
+    ↓
+Standard SRT
+    ↓
+Validation / Quality Report
+
+The application is responsible for converting an existing audio file — with or
+without a corresponding script — into a precisely timed Standard SRT file. When
+a script is supplied it remains the absolute source of truth (Section 2). When
+it is absent, local ASR generates the sentence lines instead, and every rule
+below that refers to "the script" applies to that ASR-generated text (Section 3B).
 
 The application must be completely independent from me2listen.
 
@@ -88,6 +113,44 @@ Example:
 001-greetings.en.txt
 
 The script file must be UTF-8 plain text.
+
+
+## 3B. MP3-ONLY MODE (CASE B)
+
+When a lesson's `.en.txt` is absent, the pipeline falls back to local ASR
+instead of requiring a script:
+
+lesson-name.mp3   (no lesson-name.en.txt)
+
+Flow:
+
+1. Transcribe the MP3 locally with faster-whisper (`large-v3-turbo`,
+   English-only; no other language is auto-detected).
+2. Drop any transcribed segment whose `avg_logprob` is below
+   `transcription.min_avg_logprob` (default `-1.0`, matching faster-whisper's
+   own `logprob_threshold`). WhisperX's batched transcription path does not
+   apply faster-whisper's own no-speech/low-confidence filtering, so without
+   this gate a low-confidence window (background music, an unclear voice,
+   near-silence) can decode into one confident-sounding boilerplate phrase
+   repeated for every chunk instead of failing. If nothing confident remains,
+   the lesson fails with a clear error — it must never produce a
+   plausible-looking but wrong SRT.
+3. Split the surviving transcript into one sentence per punctuation mark
+   (`.`, `!`, `?`). This becomes the same script-line structure Case A builds
+   from the `.en.txt` file — from this point on, Sections 9-18 (normalization,
+   word-level alignment, line-to-cue mapping, SRT format, validation, quality
+   report) apply identically to Case A.
+4. Force-align the ASR segments with the SAME WhisperX aligner used in Case A
+   (Section 7). ASR only supplies text; WhisperX still supplies all timing —
+   Section 2's "Script = Content, WhisperX = Timing" principle is unchanged,
+   with ASR output standing in for the script as the content source.
+
+The ASR step and the alignment step are deliberately separate engines/model
+loads so that a problem in one cannot corrupt the other (see Section 20B).
+
+Case B never runs for a lesson that has a `.en.txt` file. Case A's script
+remains the absolute source of truth whenever one exists; local ASR only fills
+the gap when no script was supplied at all.
 
 
 ## 4. SCRIPT FORMAT
@@ -624,6 +687,27 @@ Do NOT:
 - reload the model for every lesson
 
 
+## 20B. ASR DEVICE ISOLATION (CASE B)
+
+`transcription.device` (the local ASR step, ctranslate2-based, Section 3B) and
+`alignment.device` (the forced-alignment step, PyTorch-based, Section 20) are
+independent settings and default independently:
+
+alignment.device: cuda
+transcription.device: cpu
+
+This split exists because, on the target GTX 1660 Super (Section 19 — a Turing
+GPU with no Tensor Cores), ctranslate2 CUDA inference was found to silently
+return wrong, input-independent output: the same model produced the identical
+"transcribed" text for real audio, for pure silence, and for random noise. The
+same model on CPU transcribed that audio correctly, and the PyTorch alignment
+step already runs correctly on that same GPU (proven by every Case A lesson
+processed so far). If a target GPU is confirmed to run ctranslate2 correctly,
+`transcription.device` may be set to `cuda` for speed; the default stays `cpu`
+for correctness. Case A never constructs the ASR engine at all, so it is
+unaffected by either setting.
+
+
 ## 21. MODEL CONFIGURATION
 
 Model and compute settings must be configurable.
@@ -888,14 +972,10 @@ Do NOT implement:
 - FFmpeg-based YouTube extraction
 - MP3 conversion
 - MP3 modification
-- ASR
-- MP3 → transcript
-- automatic transcript generation
 - LLM integration
 - cloud transcription
 - cloud alignment
-- automatic sentence splitting
-- automatic sentence merging
+- automatic sentence splitting or merging of a SUPPLIED script (Case A)
 - automatic script rewriting
 - automatic grammar correction
 - speaker diarization
@@ -903,12 +983,17 @@ Do NOT implement:
 - me2listen database integration
 - authentication
 
+Local ASR (Case B, Section 3B) is a narrow, explicit exception to the original
+"no ASR" rule: it exists ONLY to produce sentence lines when a lesson has no
+`.en.txt` at all, runs fully offline with no cloud/LLM involvement, and never
+overrides a script that IS supplied — Case A's rules in Section 2 are unchanged.
+
 
 ## 32. SUCCESS CRITERIA
 
 The implementation is successful when it reliably processes:
 
-MP3 + TXT
+MP3 + TXT (Case A), or MP3 alone (Case B, Section 3B)
 
 and produces:
 
@@ -916,17 +1001,21 @@ Standard SRT
 
 with these guarantees:
 
-1. Every script line becomes exactly one SRT cue.
-2. SRT text exactly matches the original script line.
-3. Timing is derived from WhisperX word-level forced alignment.
-4. No sentence is automatically split or merged.
-5. Invalid/unreliable alignment is detected instead of silently producing bad data.
+1. Every script line (Case A: from `.en.txt`; Case B: from confidence-gated ASR)
+   becomes exactly one SRT cue.
+2. SRT text exactly matches the source script line — the original TXT line in
+   Case A, the punctuated ASR sentence in Case B.
+3. Timing is derived from WhisperX word-level forced alignment in both cases.
+4. No sentence is automatically split or merged once it is a script line.
+5. Invalid/unreliable alignment OR unreliable ASR is detected instead of
+   silently producing bad data (Section 3B, item 2).
 6. Output passes Standard SRT validation.
 7. Audio and SRT have identical basenames.
 8. Batch processing is sequential and memory-safe.
 9. Failed jobs can be retried.
 10. Completed jobs can be resumed/skipped.
-11. The entire pipeline runs locally without paid APIs or cloud services.
+11. The entire pipeline runs locally without paid APIs or cloud services,
+    including the Case B ASR step.
 12. The output can be imported into me2listen without preparation-tool-specific metadata.
 
 
@@ -938,7 +1027,11 @@ Build a:
 
 "Known English Script → Accurately Timed SRT"
 
-system.
+system, where the "known script" is either the supplied `.en.txt` (Case A) or a
+confidence-gated local ASR transcript that stands in for it when no `.en.txt`
+exists (Case B, Section 3B). Once that script text exists — supplied or
+transcribed — it is treated exactly the same way from Section 9 onward: WhisperX
+never re-decides what was said, only when it was said.
 
 The script controls:
 

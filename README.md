@@ -173,10 +173,12 @@ A line with no aligned words, non-monotonic/overlapping timing, or coverage belo
 configured failure threshold produces `FAIL` and no SRT. Long lines are retained
 unchanged and reported as warnings.
 
-Defaults are in [`config/default.yaml`](config/default.yaml): CUDA, English, batch
-size 1, 99% PASS coverage, 95% minimum acceptable coverage. The `transcription`
-section controls MP3-only mode (`large-v3-turbo`, `int8`, English, batch size 1).
-To fit a 6 GB GPU, the ASR model is released before the alignment model loads.
+Defaults are in [`config/default.yaml`](config/default.yaml): English, batch size 1,
+99% PASS coverage, 95% minimum acceptable coverage. `alignment.device` defaults to
+`cuda`. The `transcription` section controls MP3-only mode (`large-v3-turbo`,
+`int8`, English, batch size 1) and defaults `transcription.device` to `cpu`
+independently of `alignment.device` — see the device note above. To fit a 6 GB
+GPU, the ASR model is released before the alignment model loads.
 
 ## Tests
 
