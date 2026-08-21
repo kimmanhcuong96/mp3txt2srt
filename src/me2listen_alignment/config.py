@@ -25,6 +25,21 @@ class AlignmentConfig:
 
 
 @dataclass(slots=True)
+class TranscriptionConfig:
+    """Local English ASR settings used only when an `.en.txt` file is absent."""
+
+    model_name: str = "large-v3-turbo"
+    device: str = "cuda"
+    compute_type: str = "int8"
+    batch_size: int = 1
+    language: str = "en"
+    model_dir: Path = Path("state/models")
+    model_cache_only: bool = False
+    vad_method: str = "silero"
+    min_avg_logprob: float = -1.0
+
+
+@dataclass(slots=True)
 class QualityConfig:
     pass_coverage: float = 0.99
     warning_coverage: float = 0.95
@@ -45,6 +60,7 @@ class AppConfig:
     report_dir: Path = Path("state/reports")
     log_file: Path = Path("logs/alignment.log")
     alignment: AlignmentConfig = field(default_factory=AlignmentConfig)
+    transcription: TranscriptionConfig = field(default_factory=TranscriptionConfig)
     quality: QualityConfig = field(default_factory=QualityConfig)
     retry_count: int = 2
     copy_audio_to_output: bool = True
@@ -57,6 +73,18 @@ class AppConfig:
             raise ValueError("alignment.batch_size must be 1 for the sequential v1 pipeline")
         if self.alignment.device not in {"cuda", "cpu"}:
             raise ValueError("alignment.device must be 'cuda' or 'cpu'")
+        if self.transcription.device not in {"cuda", "cpu"}:
+            raise ValueError("transcription.device must be 'cuda' or 'cpu'")
+        if self.transcription.language != "en":
+            raise ValueError("transcription.language must be 'en' in this version")
+        if self.transcription.batch_size < 1:
+            raise ValueError("transcription.batch_size must be at least 1")
+        if not self.transcription.model_name:
+            raise ValueError("transcription.model_name must not be empty")
+        if not self.transcription.compute_type:
+            raise ValueError("transcription.compute_type must not be empty")
+        if self.transcription.min_avg_logprob >= 0:
+            raise ValueError("transcription.min_avg_logprob must be negative")
         if self.alignment.interpolate_method != "ignore":
             raise ValueError("alignment.interpolate_method must be 'ignore' so missing timing is never invented")
         if (
@@ -97,29 +125,36 @@ def load_config(path: Path | None = None, overrides: dict[str, Any] | None = Non
 
     allowed = {
         "input_dir", "output_dir", "state_db", "report_dir",
-        "log_file", "alignment", "quality", "retry_count", "copy_audio_to_output", "package_name",
+        "log_file", "alignment", "transcription", "quality", "retry_count", "copy_audio_to_output", "package_name",
     }
     unknown = set(raw) - allowed
     if unknown:
         raise ValueError(f"Unknown configuration keys: {', '.join(sorted(unknown))}")
     alignment_raw = raw.pop("alignment", {}) or {}
+    transcription_raw = raw.pop("transcription", {}) or {}
     quality_raw = raw.pop("quality", {}) or {}
-    if not isinstance(alignment_raw, dict) or not isinstance(quality_raw, dict):
-        raise ValueError("alignment and quality configuration must be mappings")
+    if not isinstance(alignment_raw, dict) or not isinstance(transcription_raw, dict) or not isinstance(quality_raw, dict):
+        raise ValueError("alignment, transcription, and quality configuration must be mappings")
     alignment_allowed = set(AlignmentConfig.__dataclass_fields__)
+    transcription_allowed = set(TranscriptionConfig.__dataclass_fields__)
     quality_allowed = set(QualityConfig.__dataclass_fields__)
     if set(alignment_raw) - alignment_allowed:
         raise ValueError(f"Unknown alignment keys: {', '.join(sorted(set(alignment_raw) - alignment_allowed))}")
+    if set(transcription_raw) - transcription_allowed:
+        raise ValueError(f"Unknown transcription keys: {', '.join(sorted(set(transcription_raw) - transcription_allowed))}")
     if set(quality_raw) - quality_allowed:
         raise ValueError(f"Unknown quality keys: {', '.join(sorted(set(quality_raw) - quality_allowed))}")
     if "model_dir" in alignment_raw:
         alignment_raw["model_dir"] = _path(alignment_raw["model_dir"])
+    if "model_dir" in transcription_raw:
+        transcription_raw["model_dir"] = _path(transcription_raw["model_dir"])
     for key in ("input_dir", "output_dir", "state_db", "report_dir", "log_file"):
         if key in raw:
             raw[key] = _path(raw[key])
     config = AppConfig(
         **raw,
         alignment=AlignmentConfig(**alignment_raw),
+        transcription=TranscriptionConfig(**transcription_raw),
         quality=QualityConfig(**quality_raw),
     )
     config.validate()

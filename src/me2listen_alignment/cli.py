@@ -15,13 +15,13 @@ from .packaging import create_package
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Align known MP3/TXT lesson pairs with WhisperX and generate Standard SRT."
+        description="Generate sentence-level SRT from MP3 + .en.txt scripts or MP3-only English audio."
     )
     parser.add_argument("--config", type=Path, help="YAML configuration file")
-    parser.add_argument("--input", type=Path, help="Recursive directory containing colocated MP3/TXT pairs")
+    parser.add_argument("--input", type=Path, help="Recursive directory containing MP3 files and optional .en.txt scripts")
     parser.add_argument("--output", type=Path, help="Output directory for MP3/SRT pairs")
     parser.add_argument("--state", type=Path, help="SQLite job-state path")
-    parser.add_argument("--device", choices=("cuda", "cpu"), help="Alignment device override")
+    parser.add_argument("--device", choices=("cuda", "cpu"), help="Override the transcription and alignment device")
     parser.add_argument("--lesson", action="append", help="Process one relative lesson path; repeatable")
     parser.add_argument("--resume", action="store_true", help="Resume queued, interrupted, and failed jobs")
     parser.add_argument("--package", action="store_true", help="Create the configured ZIP after processing")
@@ -58,8 +58,12 @@ def main(argv: list[str] | None = None) -> int:
         config = load_config(args.config, overrides)
         if args.device:
             config.alignment.device = args.device
+            config.transcription.device = args.device
             config.validate()
-        for directory in (config.output_dir, config.report_dir, config.alignment.model_dir):
+        for directory in (
+            config.output_dir, config.report_dir, config.alignment.model_dir,
+            config.transcription.model_dir,
+        ):
             directory.mkdir(parents=True, exist_ok=True)
         configure_logging(config.log_file)
         pairs = discover_pairs(config)
@@ -67,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
         jobs.sync(pairs, require_output_audio=config.copy_audio_to_output)
         if not pairs:
             print(
-                f"No lesson files found. Put matching MP3/TXT pairs in {config.input_dir}."
+                f"No lesson files found. Put MP3 files (with optional matching .en.txt scripts) in {config.input_dir}."
             )
         success = True
         if not args.package_only and pairs:

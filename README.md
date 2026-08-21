@@ -1,22 +1,22 @@
 # me2listen Local Lesson Alignment
 
-A fully local batch tool for one specific job:
+A fully local batch tool with two input modes:
 
 ```text
-known English MP3 + authoritative line-based TXT script
+known English MP3/WAV + authoritative line-based `.en.txt` script
                          ↓
                WhisperX forced alignment
                          ↓
                     Standard SRT
 ```
 
-The script controls the exact text, line boundaries, and order. WhisperX supplies
-word timestamps only. The application never transcribes, rewrites, splits, merges,
-or modifies the source MP3.
+When an `.en.txt` file is present, it controls the exact text, line boundaries, and
+order. When it is absent, the application transcribes the MP3 locally and creates
+one cue per punctuated English sentence. The source MP3 is never modified.
 
 ## Input and output
 
-Put each MP3 beside its matching `.en.txt` script. For example,
+Put each MP3 beside an optional matching `.en.txt` script. For example,
 `01_First Snow Fall.mp3` pairs with `01_First Snow Fall.en.txt`. The scanner is recursive, and every
 subdirectory may contain any number of pairs:
 
@@ -36,6 +36,10 @@ Every non-empty TXT line is exactly one subtitle cue. TXT must be UTF-8 and must
 not contain timestamps, numbering, speaker labels, comments, or metadata.
 Leading and trailing whitespace on each line is trimmed automatically; whitespace
 inside the sentence is preserved for SRT output.
+
+For MP3-only mode, place only the MP3 in `input/`. The tool uses local WhisperX
+ASR (`large-v3-turbo`, English) followed by the existing English forced aligner.
+It does not use an LLM or cloud API.
 
 Successful output:
 
@@ -75,14 +79,16 @@ python -m pip install -e .
 ```
 
 FFmpeg must also be installed and available on `PATH` because WhisperX uses it to
-decode MP3 files:
+decode input audio:
 
 ```powershell
 ffmpeg -version
 ```
 
-The first run may download the default English alignment model into `state/models`.
-After it is cached, set `model_cache_only: true` for strictly offline runs.
+The first script-based run may download the default English alignment model into
+`state/models`. The first MP3-only run also downloads `large-v3-turbo`. After a
+model is cached, set the relevant `model_cache_only: true` configuration value for
+strictly offline runs.
 
 ## Run
 
@@ -116,10 +122,33 @@ error, `130` interrupted.
 
 ## Alignment and quality behavior
 
-The engine creates one known-transcript segment spanning the real audio duration and
-calls `whisperx.align()` directly—there is no ASR transcription step. WhisperX's
-timestamp interpolation is forced to `ignore`. Untimed words therefore reduce
-coverage instead of receiving invented timestamps.
+For script mode, the engine creates one known-transcript segment spanning the real
+audio duration and calls `whisperx.align()` directly. For MP3-only mode, it first
+transcribes English with `large-v3-turbo`, releases that ASR model from GPU memory,
+then aligns Whisper's timestamped segments with the same English
+`WAV2VEC2_ASR_BASE_960H` aligner. Timestamp interpolation is forced to `ignore`.
+
+WhisperX's batched transcription path does not apply faster-whisper's own
+no-speech/low-confidence filtering, so a window of background music, singing, or
+unclear audio can otherwise decode into a single confident-sounding boilerplate
+phrase (e.g. "We'll see you next time.") repeated for every chunk instead of
+failing loudly. Any transcribed segment whose `avg_logprob` falls below
+`transcription.min_avg_logprob` (default `-1.0`, matching faster-whisper's own
+`logprob_threshold`) is dropped; if nothing confident remains, the lesson fails
+with a clear error instead of producing a wrong SRT that still passes quality
+checks.
+
+`transcription.device` (the ASR step, ctranslate2-based) defaults to `cpu`,
+independently of `alignment.device` (the forced-alignment step, PyTorch-based),
+which defaults to `cuda`. Script-mode lessons never construct the ASR engine at
+all, so this only affects MP3-only lessons. The split default exists because
+ctranslate2 CUDA inference can silently return wrong, input-independent output
+on GPUs without Tensor Cores (verified on a GTX 1660 SUPER: the same model
+produced identical "transcribed" text for real audio, silence, and random
+noise), while the same model on CPU transcribes correctly and the PyTorch
+alignment step already runs correctly on that same GPU. If your GPU handles
+ctranslate2 correctly, set `transcription.device: cuda` for speed; otherwise
+leave it on `cpu`.
 
 Aligned tokens are matched in order to tokens from each authoritative script line.
 Each cue starts at its earliest matched word and ends at its latest matched word.
@@ -145,8 +174,9 @@ configured failure threshold produces `FAIL` and no SRT. Long lines are retained
 unchanged and reported as warnings.
 
 Defaults are in [`config/default.yaml`](config/default.yaml): CUDA, English, batch
-size 1, 99% PASS coverage, 95% minimum acceptable coverage. The alignment model is
-loaded once and reused across the sequential batch.
+size 1, 99% PASS coverage, 95% minimum acceptable coverage. The `transcription`
+section controls MP3-only mode (`large-v3-turbo`, `int8`, English, batch size 1).
+To fit a 6 GB GPU, the ASR model is released before the alignment model loads.
 
 ## Tests
 

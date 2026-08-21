@@ -24,3 +24,21 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(config.alignment.device, "cpu")
             self.assertEqual(config.quality.pass_coverage, 0.98)
 
+    def test_loads_transcription_configuration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.yaml"
+            path.write_text(
+                "transcription:\n  model_name: small.en\n  device: cpu\n"
+                "  compute_type: int8\n  batch_size: 2\n  language: en\n",
+                encoding="utf-8",
+            )
+            config = load_config(path)
+            self.assertEqual(config.transcription.model_name, "small.en")
+            self.assertEqual(config.transcription.batch_size, 2)
+
+    def test_rejects_non_negative_transcription_confidence_floor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.yaml"
+            path.write_text("transcription:\n  min_avg_logprob: 0.0\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "min_avg_logprob"):
+                load_config(path)

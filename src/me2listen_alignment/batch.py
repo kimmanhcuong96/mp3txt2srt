@@ -10,12 +10,14 @@ from typing import Callable
 
 from .alignment.mapper import map_words_to_lines
 from .alignment.boundary import refine_cue_boundaries
+from .alignment.transcription import WhisperXTranscriptionEngine
 from .alignment.whisperx_engine import WhisperXEngine
 from .config import AppConfig
 from .jobs import JobStore
 from .models import LessonPair, QualityReport
 from .quality.analyzer import analyze_quality, write_report
 from .script.parser import parse_script
+from .script.auto_transcript import transcript_to_script_lines
 from .subtitle.srt_writer import write_srt
 
 
@@ -119,18 +121,45 @@ class BatchProcessor:
             self.config.alignment.model_name or "default", self.config.alignment.batch_size,
         )
         _validate_pair(pair)
-        self.print("Validating script...")
-        try:
-            lines = parse_script(pair.script_path)
-        except (OSError, ValueError) as exc:
-            raise PermanentJobError(str(exc)) from exc
+        auto_transcription = not pair.script_path.is_file()
+        transcript_segments = None
+        if auto_transcription:
+            # Never retain the forced aligner while the larger ASR model is on GPU.
+            if self.engine is not None:
+                self.engine.close()
+                self.engine = None
+            self.print("No .en.txt script found; transcribing English audio locally...")
+            transcriber = WhisperXTranscriptionEngine(self.config.transcription)
+            try:
+                transcription = transcriber.transcribe(pair.audio_path)
+            finally:
+                transcriber.close()
+            self.print("Splitting Whisper transcript into sentences...")
+            try:
+                lines = transcript_to_script_lines(transcription.text)
+            except ValueError as exc:
+                raise PermanentJobError(str(exc)) from exc
+            transcript_segments = transcription.segments
+        else:
+            self.print("Validating script...")
+            try:
+                lines = parse_script(pair.script_path)
+            except (OSError, ValueError) as exc:
+                raise PermanentJobError(str(exc)) from exc
         if self.engine is None:
             self.print("Loading WhisperX alignment model once for this batch...")
             self.engine = WhisperXEngine(
                 self.config.alignment, self.config.quality.silence_threshold_db
-            )
+        )
         self.print("Running WhisperX forced alignment...")
-        engine_result = self.engine.align(pair.audio_path, lines)
+        try:
+            engine_result = (
+                self.engine.align_transcript(pair.audio_path, transcript_segments)
+                if transcript_segments is not None
+                else self.engine.align(pair.audio_path, lines)
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise RuntimeError(f"alignment failed: {pair.audio_path}: {exc}") from exc
         self.print("Mapping aligned words to original script lines...")
         mapping = map_words_to_lines(lines, engine_result.words)
         if self.config.alignment.boundary_refinement_enabled:
@@ -170,7 +199,7 @@ class BatchProcessor:
         self.print("Generating and validating Standard SRT...")
         write_srt(mapping.cues, pair.srt_path, engine_result.duration_seconds)
         if self.config.copy_audio_to_output:
-            self.print("Copying original MP3 without modification...")
+            self.print("Copying original audio without modification...")
             _copy_audio_unchanged(pair.audio_path, pair.output_audio_path)
         return report
 
@@ -187,14 +216,15 @@ def _pair_from_row(row) -> LessonPair:
 
 def _validate_pair(pair: LessonPair) -> None:
     if not pair.audio_path.is_file():
-        raise PermanentJobError(f"MP3 file not found: {pair.audio_path}")
-    if not pair.script_path.is_file():
-        raise PermanentJobError(f"TXT file not found: {pair.script_path}")
-    if pair.audio_path.suffix.casefold() != ".mp3" or not pair.script_path.name.casefold().endswith(".en.txt"):
-        raise PermanentJobError("Input pair must use .mp3 and .en.txt extensions")
-    script_basename = pair.script_path.name[:-len(".en.txt")]
-    if pair.audio_path.stem.casefold() != script_basename.casefold():
-        raise PermanentJobError("MP3 basename must match the part before .en.txt")
+        raise PermanentJobError(f"Audio file not found: {pair.audio_path}")
+    if pair.audio_path.suffix.casefold() not in {".mp3", ".wav"}:
+        raise PermanentJobError("Input audio must use the .mp3 or .wav extension")
+    if pair.script_path.is_file():
+        if not pair.script_path.name.casefold().endswith(".en.txt"):
+            raise PermanentJobError("Input script must use the .en.txt extension")
+        script_basename = pair.script_path.name[:-len(".en.txt")]
+        if pair.audio_path.stem.casefold() != script_basename.casefold():
+            raise PermanentJobError("MP3 basename must match the part before .en.txt")
     if pair.srt_path.stem.casefold() != pair.audio_path.stem.casefold():
         raise PermanentJobError("Output SRT basename must match the input MP3")
 

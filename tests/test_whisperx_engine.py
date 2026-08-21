@@ -63,3 +63,28 @@ class WhisperXEngineTests(unittest.TestCase):
         self.assertEqual(calls["align"]["interpolate_method"], "ignore")
         self.assertNotIn("transcribe", calls)
         self.assertEqual(result.words[0].normalized, "hello")
+
+    def test_aligns_whisper_transcription_segments(self):
+        calls = {}
+        fake_torch = types.ModuleType("torch")
+        fake_torch.cuda = _Cuda()
+        fake_whisperx = types.ModuleType("whisperx")
+
+        fake_whisperx.load_align_model = lambda **_kwargs: (object(), {"language": "en"})
+        fake_whisperx.load_audio = lambda _path: [0.0] * 32_000
+        fake_whisperx.align = lambda **kwargs: calls.setdefault("align", kwargs) or {"word_segments": []}
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            sys.modules, {"torch": fake_torch, "whisperx": fake_whisperx}
+        ), patch(
+            "me2listen_alignment.alignment.whisperx_engine._detect_leading_silence", return_value=0.0
+        ), patch(
+            "me2listen_alignment.alignment.whisperx_engine.sys.version_info", (3, 12, 10)
+        ):
+            engine = WhisperXEngine(AlignmentConfig(model_dir=Path(directory)), -45.0)
+            engine.align_transcript(
+                Path("lesson.mp3"), ({"start": 0.2, "end": 1.5, "text": "Hello world."},)
+            )
+            engine.close()
+        self.assertEqual(calls["align"]["transcript"], [
+            {"start": 0.2, "end": 1.5, "text": "Hello world."}
+        ])

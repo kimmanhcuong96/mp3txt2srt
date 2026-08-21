@@ -10,7 +10,7 @@ SCRIPT_SUFFIX = ".en.txt"
 
 def discover_pairs(config: AppConfig) -> list[LessonPair]:
     config.input_dir.mkdir(parents=True, exist_ok=True)
-    audio = _index_files(config.input_dir, ".mp3")
+    audio = _index_audio_files(config.input_dir)
     scripts = _index_files(config.input_dir, SCRIPT_SUFFIX)
     pairs: list[LessonPair] = []
     for key in sorted(set(audio) | set(scripts)):
@@ -26,7 +26,7 @@ def discover_pairs(config: AppConfig) -> list[LessonPair]:
                 audio_path=audio_path or (config.input_dir / relative_stem).with_suffix(".mp3"),
                 script_path=script_path or _script_path(config.input_dir / relative_stem),
                 srt_path=output_stem.with_suffix(".srt"),
-                output_audio_path=output_stem.with_suffix(".mp3"),
+                output_audio_path=output_stem.with_suffix(audio_path.suffix if audio_path else ".mp3"),
             )
         )
     return pairs
@@ -36,6 +36,21 @@ def _index_files(directory: Path, suffix: str) -> dict[str, Path]:
     indexed: dict[str, Path] = {}
     for path in directory.rglob("*"):
         if not path.is_file() or not path.name.casefold().endswith(suffix.casefold()):
+            continue
+        key = _relative_lesson_stem(path, directory).as_posix().casefold()
+        if key in indexed:
+            raise ValueError(
+                f"Duplicate lesson path (case-insensitive) in {directory}: "
+                f"{indexed[key].relative_to(directory)}, {path.relative_to(directory)}"
+            )
+        indexed[key] = path
+    return indexed
+
+
+def _index_audio_files(directory: Path) -> dict[str, Path]:
+    indexed: dict[str, Path] = {}
+    for path in directory.rglob("*"):
+        if not path.is_file() or path.suffix.casefold() not in {".mp3", ".wav"}:
             continue
         key = _relative_lesson_stem(path, directory).as_posix().casefold()
         if key in indexed:

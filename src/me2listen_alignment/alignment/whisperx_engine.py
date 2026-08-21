@@ -59,6 +59,31 @@ class WhisperXEngine:
             raise RuntimeError("Audio duration must be positive")
         known_text = "\n".join(line.alignment_text for line in lines)
         transcript = [{"start": 0.0, "end": duration, "text": known_text}]
+        return self._align_loaded_audio(audio, duration, transcript)
+
+    def align_transcript(self, audio_path: Path, transcript: tuple[dict[str, Any], ...]) -> EngineResult:
+        """Force-align timestamped Whisper transcription segments for auto mode."""
+        audio = self.whisperx.load_audio(str(audio_path))
+        duration = float(len(audio) / self.sample_rate)
+        if not math.isfinite(duration) or duration <= 0:
+            raise RuntimeError("Audio duration must be positive")
+        cleaned: list[dict[str, Any]] = []
+        for segment in transcript:
+            text = str(segment.get("text", "")).strip()
+            try:
+                start = max(0.0, float(segment["start"]))
+                end = min(duration, float(segment["end"]))
+            except (KeyError, TypeError, ValueError) as exc:
+                raise RuntimeError("transcription returned a segment without valid timestamps") from exc
+            if text and start < end:
+                cleaned.append({"start": start, "end": end, "text": text})
+        if not cleaned:
+            raise RuntimeError("transcription returned no alignable segments")
+        return self._align_loaded_audio(audio, duration, cleaned)
+
+    def _align_loaded_audio(
+        self, audio: Any, duration: float, transcript: list[dict[str, Any]]
+    ) -> EngineResult:
         aligned = self.whisperx.align(
             transcript=transcript,
             model=self.model,

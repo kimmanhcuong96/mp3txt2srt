@@ -88,3 +88,11 @@ class JobsDiscoveryTests(unittest.TestCase):
             pairs[0].srt_path,
             self.config.output_dir / "section1/01_First Snow Fall.srt",
         )
+
+    def test_preserves_wav_extension_in_output_audio(self):
+        (self.config.input_dir / "lesson.wav").write_bytes(b"audio")
+        (self.config.input_dir / "lesson.en.txt").write_text("Hello.\n", encoding="utf-8")
+
+        pairs = discover_pairs(self.config)
+
+        self.assertEqual(pairs[0].output_audio_path.suffix, ".wav")

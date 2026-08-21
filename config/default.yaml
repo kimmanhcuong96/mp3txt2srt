@@ -19,6 +19,17 @@ alignment:
   boundary_speech_padding: 0.02
   boundary_embedded_silence_minimum: 0.30
 
+transcription:
+  model_name: large-v3-turbo
+  device: cpu
+  compute_type: int8
+  batch_size: 1
+  language: en
+  model_dir: state/models
+  model_cache_only: false
+  vad_method: silero
+  min_avg_logprob: -1.0
+
 quality:
   pass_coverage: 0.99
   warning_coverage: 0.95
