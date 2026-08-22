@@ -136,10 +136,17 @@ Flow:
    the lesson fails with a clear error — it must never produce a
    plausible-looking but wrong SRT.
 3. Split the surviving transcript into one sentence per punctuation mark
-   (`.`, `!`, `?`). This becomes the same script-line structure Case A builds
-   from the `.en.txt` file — from this point on, Sections 9-18 (normalization,
-   word-level alignment, line-to-cue mapping, SRT format, validation, quality
-   report) apply identically to Case A.
+   (`.`, `!`, `?`). Discard any fragment containing no words at all (punctuation
+   the model emits for noise or hesitation) so its text can never reach a cue.
+   Any remaining sentence under `transcription.min_sentence_words` (default 5)
+   words is folded into the sentence right after it — repeatedly, if the merged
+   result is still under the minimum — since a short fragment ("Yes.", "OK.")
+   is rarely a usable standalone subtitle cue; a trailing short fragment with
+   no next sentence is folded into the previous one instead. What remains
+   becomes the same script-line structure Case A builds from the `.en.txt`
+   file — from this point on, Sections 9-18 (normalization, word-level
+   alignment, line-to-cue mapping, SRT format, validation, quality report)
+   apply identically to Case A.
 4. Force-align the ASR segments with the SAME WhisperX aligner used in Case A
    (Section 7). ASR only supplies text; WhisperX still supplies all timing —
    Section 2's "Script = Content, WhisperX = Timing" principle is unchanged,

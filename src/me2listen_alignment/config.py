@@ -37,6 +37,7 @@ class TranscriptionConfig:
     model_cache_only: bool = False
     vad_method: str = "silero"
     min_avg_logprob: float = -1.0
+    min_sentence_words: int = 5
 
 
 @dataclass(slots=True)
@@ -85,6 +86,8 @@ class AppConfig:
             raise ValueError("transcription.compute_type must not be empty")
         if self.transcription.min_avg_logprob >= 0:
             raise ValueError("transcription.min_avg_logprob must be negative")
+        if self.transcription.min_sentence_words < 1:
+            raise ValueError("transcription.min_sentence_words must be at least 1")
         if self.alignment.interpolate_method != "ignore":
             raise ValueError("alignment.interpolate_method must be 'ignore' so missing timing is never invented")
         if (

@@ -136,7 +136,9 @@ class BatchProcessor:
                 transcriber.close()
             self.print("Splitting Whisper transcript into sentences...")
             try:
-                lines = transcript_to_script_lines(transcription.text)
+                lines = transcript_to_script_lines(
+                    transcription.text, self.config.transcription.min_sentence_words
+                )
             except ValueError as exc:
                 raise PermanentJobError(str(exc)) from exc
             transcript_segments = transcription.segments

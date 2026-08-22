@@ -29,6 +29,7 @@ transcription:
   model_cache_only: false
   vad_method: silero
   min_avg_logprob: -1.0
+  min_sentence_words: 5
 
 quality:
   pass_coverage: 0.99

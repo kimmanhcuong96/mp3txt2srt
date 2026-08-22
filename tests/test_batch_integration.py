@@ -40,14 +40,21 @@ class _FakeAutoEngine:
     def align_transcript(self, _audio_path, segments):
         self.__class__.transcript_called = bool(segments)
         words = (
-            AlignedWord("Hello", "hello", 0.1, 0.3),
-            AlignedWord("world", "world", 0.3, 0.6),
-            AlignedWord("How", "how", 1.0, 1.2),
-            AlignedWord("are", "are", 1.2, 1.4),
-            AlignedWord("you", "you", 1.4, 1.7),
+            AlignedWord("Hello", "hello", 0.1, 0.2),
+            AlignedWord("there", "there", 0.2, 0.3),
+            AlignedWord("my", "my", 0.3, 0.4),
+            AlignedWord("dear", "dear", 0.4, 0.5),
+            AlignedWord("world", "world", 0.5, 0.6),
+            AlignedWord("How", "how", 1.0, 1.1),
+            AlignedWord("are", "are", 1.1, 1.2),
+            AlignedWord("you", "you", 1.2, 1.3),
+            AlignedWord("feeling", "feeling", 1.3, 1.4),
+            AlignedWord("today", "today", 1.4, 1.5),
             AlignedWord("I", "i", 2.0, 2.1),
-            AlignedWord("am", "am", 2.1, 2.3),
-            AlignedWord("fine", "fine", 2.3, 2.6),
+            AlignedWord("am", "am", 2.1, 2.2),
+            AlignedWord("feeling", "feeling", 2.2, 2.3),
+            AlignedWord("really", "really", 2.3, 2.4),
+            AlignedWord("great", "great", 2.4, 2.5),
         )
         return EngineResult(words=words, duration_seconds=3.0, leading_silence_seconds=0.0)
 
@@ -64,11 +71,11 @@ class _FakeTranscriber:
     def transcribe(self, _audio_path):
         self.__class__.called = True
         return TranscriptionResult(
-            text="Hello world. How are you? I am fine!",
+            text="Hello there my dear world. How are you feeling today? I am feeling really great!",
             segments=(
-                {"start": 0.0, "end": 0.8, "text": "Hello world."},
-                {"start": 0.9, "end": 1.8, "text": "How are you?"},
-                {"start": 1.9, "end": 2.7, "text": "I am fine!"},
+                {"start": 0.0, "end": 0.8, "text": "Hello there my dear world."},
+                {"start": 0.9, "end": 1.8, "text": "How are you feeling today?"},
+                {"start": 1.9, "end": 2.7, "text": "I am feeling really great!"},
             ),
         )
 
@@ -141,8 +148,8 @@ class BatchIntegrationTests(unittest.TestCase):
                 self.assertTrue(_FakeAutoEngine.transcript_called)
                 srt = (config.output_dir / "lesson.srt").read_text(encoding="utf-8")
                 self.assertEqual(srt.count(" --> "), 3)
-                self.assertIn("Hello world.", srt)
-                self.assertIn("How are you?", srt)
-                self.assertIn("I am fine!", srt)
+                self.assertIn("Hello there my dear world.", srt)
+                self.assertIn("How are you feeling today?", srt)
+                self.assertIn("I am feeling really great!", srt)
             finally:
                 store.close()

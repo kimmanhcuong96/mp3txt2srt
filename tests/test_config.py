@@ -42,3 +42,12 @@ class ConfigTests(unittest.TestCase):
             path.write_text("transcription:\n  min_avg_logprob: 0.0\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "min_avg_logprob"):
                 load_config(path)
+
+    def test_loads_and_validates_the_sentence_word_minimum(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.yaml"
+            path.write_text("transcription:\n  min_sentence_words: 8\n", encoding="utf-8")
+            self.assertEqual(load_config(path).transcription.min_sentence_words, 8)
+            path.write_text("transcription:\n  min_sentence_words: 0\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "min_sentence_words"):
+                load_config(path)
