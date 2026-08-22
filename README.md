@@ -40,8 +40,12 @@ inside the sentence is preserved for SRT output.
 For MP3-only mode, place only the MP3 in `input/`. The tool uses local WhisperX
 ASR (`large-v3-turbo`, English) followed by the existing English forced aligner.
 It does not use an LLM or cloud API. The transcript is split into one cue per
-punctuated sentence. Wordless fragments (punctuation the model emits for noise)
-are discarded, and any sentence under `transcription.min_sentence_words`
+punctuated sentence, treating a period after a capitalized title ("Dr.", "Mr.",
+"Mrs.", "Ms.", "Prof.", "Rev.", "St.") as an abbreviation mark rather than a
+sentence end — while still breaking correctly after "May 1st.", "500 ms.", and
+a sentence-final letter such as "The answer is A." Wordless fragments
+(punctuation the model emits for noise) are discarded first, and any sentence
+under `transcription.min_sentence_words`
 (default 5) is folded into the sentence after it — repeatedly, if still under
 the minimum — or into the previous one if it's the last sentence with nothing to
 merge forward into.

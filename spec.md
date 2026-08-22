@@ -136,8 +136,24 @@ Flow:
    the lesson fails with a clear error — it must never produce a
    plausible-looking but wrong SRT.
 3. Split the surviving transcript into one sentence per punctuation mark
-   (`.`, `!`, `?`). Discard any fragment containing no words at all (punctuation
-   the model emits for noise or hesitation) so its text can never reach a cue.
+   (`.`, `!`, `?`). First discard any fragment containing no words at all
+   (punctuation the model emits for noise or hesitation) so its text can never
+   reach a cue — this happens before the abbreviation step below, otherwise
+   such a fragment could ride into a sentence attached to a preceding
+   abbreviation. Then suppress the break where the period is an abbreviation
+   mark rather than a full stop: a capitalized title from `ABBREVIATIONS`
+   ("Dr.", "Mr.", "Mrs.", "Ms.", "Prof.", "Rev.", "St."), which essentially
+   never ends an English sentence. Three constraints keep that test from
+   over-firing, each covering a verified failure: a word boundary, so the
+   ordinal suffix of "1st." / "21st." is not read as "St."; required
+   capitalization, so the unit "500 ms." is not read as "Ms."; and no
+   single-letter/initials rule, since protecting "J. K. Rowling" would cost
+   every sentence ending in "I." or a spoken letter ("The answer is A."),
+   which this lesson material is far likelier to contain. The list stays small
+   for the same reason: wrongly joining two sentences is a milder error than
+   wrongly cutting one in half, but that asymmetry only justifies entries that
+   are unambiguous, so words that genuinely do end sentences ("etc.", "Inc.",
+   "Jr.") and titles absent from this material are left out.
    Any remaining sentence under `transcription.min_sentence_words` (default 5)
    words is folded into the sentence right after it — repeatedly, if the merged
    result is still under the minimum — since a short fragment ("Yes.", "OK.")

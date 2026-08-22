@@ -62,6 +62,62 @@ class AutoTranscriptTests(unittest.TestCase):
                     ["Hello there my dear world."],
                 )
 
+    def test_does_not_break_a_sentence_at_a_title_abbreviation(self):
+        for text, expected in (
+            ("We went to see Dr. Lee about the problem.",
+             ["We went to see Dr. Lee about the problem."]),
+            ("I met Mr. Brown and Mrs. Green yesterday at the park.",
+             ["I met Mr. Brown and Mrs. Green yesterday at the park."]),
+            ("She lives on St. Andrew Street near the school.",
+             ["She lives on St. Andrew Street near the school."]),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(split_english_sentences(text), expected)
+
+    def test_still_splits_a_real_sentence_boundary_after_an_abbreviation_sentence(self):
+        self.assertEqual(
+            split_english_sentences("Dr. Lee arrived early today. The class had already started."),
+            ["Dr. Lee arrived early today.", "The class had already started."],
+        )
+
+    def test_keeps_a_boundary_after_an_ordinal_that_ends_in_st(self):
+        for text, expected in (
+            ("My birthday is May 1st. We had a big party.",
+             ["My birthday is May 1st.", "We had a big party."]),
+            ("The class starts on the 21st. Do not be late.",
+             ["The class starts on the 21st.", "Do not be late."]),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(split_english_sentences(text), expected)
+
+    def test_keeps_a_boundary_after_a_sentence_final_single_letter(self):
+        # Protecting initials ("J. K. Rowling") is deliberately given up so that
+        # a sentence ending in "I." or a spoken letter still breaks correctly.
+        for text, expected in (
+            ("So did I. Then we all went home.",
+             ["So did I.", "Then we all went home."]),
+            ("The answer is A. Please write it down.",
+             ["The answer is A.", "Please write it down."]),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(split_english_sentences(text), expected)
+
+    def test_keeps_a_boundary_after_a_lowercase_lookalike_of_an_abbreviation(self):
+        for text, expected in (
+            ("The timer showed 500 ms. That was fast enough.",
+             ["The timer showed 500 ms.", "That was fast enough."]),
+            ("Do one more rep. Then you can rest.",
+             ["Do one more rep.", "Then you can rest."]),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(split_english_sentences(text), expected)
+
+    def test_drops_a_wordless_fragment_sitting_after_an_abbreviation(self):
+        self.assertEqual(
+            split_english_sentences("We saw Dr. ... Lee yesterday at the clinic."),
+            ["We saw Dr. Lee yesterday at the clinic."],
+        )
+
     def test_honors_a_configured_word_minimum(self):
         text = "Hello world. How are you today?"
         self.assertEqual(
